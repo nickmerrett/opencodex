@@ -139,6 +139,23 @@ export namespace Provider {
         },
       }
     },
+    "ibm-watsonx": async () => {
+      const apiKey = process.env["WATSONX_APIKEY"] || process.env["IBM_WATSONX_APIKEY"]
+      const projectId = process.env["WATSONX_PROJECT_ID"] || process.env["IBM_WATSONX_PROJECT_ID"]
+      if (!apiKey || !projectId) return { autoload: false }
+
+      return {
+        autoload: true,
+        options: {
+          apiKey,
+          projectId,
+          baseURL: "https://us-south.ml.cloud.ibm.com",
+        },
+        async getModel(sdk: any, modelID: string) {
+          return sdk.languageModel(modelID)
+        },
+      }
+    },
   }
 
   const state = Instance.state(async () => {

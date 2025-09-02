@@ -1,0 +1,43 @@
+{
+  "name": "@ai-sdk/ibm-watsonx",
+  "version": "0.0.1",
+  "description": "IBM watsonx.ai AI SDK provider",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bun run build"
+  },
+  "peerDependencies": {
+    "@ai-sdk/provider": "*",
+    "@ai-sdk/provider-utils": "*"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "keywords": [
+    "ai",
+    "ibm",
+    "watsonx",
+    "ai-sdk",
+    "language-model"
+  ],
+  "author": "OpenCode",
+  "license": "MIT"
+}
