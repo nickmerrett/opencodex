@@ -243,6 +243,8 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
     let finishReason: LanguageModelV2FinishReason = "other"
     let usage = { promptTokens: 0, completionTokens: 0 }
 
+    const mapFinishReason = this.mapFinishReason.bind(this)
+    
     const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
         const reader = response.value.getReader()
@@ -272,7 +274,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               }
 
               if (result.stop_reason) {
-                finishReason = this.mapFinishReason(result.stop_reason)
+                finishReason = mapFinishReason(result.stop_reason)
               }
 
               if (result.input_token_count !== undefined || result.generated_token_count !== undefined) {
