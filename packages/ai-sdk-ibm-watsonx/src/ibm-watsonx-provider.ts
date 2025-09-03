@@ -263,13 +263,14 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               break
             }
 
-            if (value.results && value.results[0]) {
-              const result = value.results[0]
+            if (value.success && value.value.results && value.value.results[0]) {
+              const result = value.value.results[0]
               
               if (result.generated_text) {
                 controller.enqueue({
                   type: "text-delta",
-                  textDelta: result.generated_text,
+                  id: "0",
+                  delta: result.generated_text,
                 })
               }
 
