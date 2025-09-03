@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LanguageModelV1, LanguageModelV1StreamPart, type LanguageModelV1CallOptions, type LanguageModelV1CallWarning, type LanguageModelV1FinishReason, type LanguageModelV1FunctionTool, type LanguageModelV1LogProbs, type LanguageModelV1Message, type LanguageModelV1ProviderMetadata, type LanguageModelV1StreamPart as StreamPart } from "@ai-sdk/provider"
+import { LanguageModelV2, LanguageModelV2StreamPart, type LanguageModelV2CallOptions, type LanguageModelV2CallWarning, type LanguageModelV2FinishReason, type LanguageModelV2Message, type LanguageModelV2ProviderMetadata } from "@ai-sdk/provider"
 import { FetchFunction, combineHeaders, createEventSourceResponseHandler, createJsonResponseHandler, postJsonToApi } from "@ai-sdk/provider-utils"
 
 export type IBMWatsonxConfig = {
@@ -21,13 +21,25 @@ export interface IBMWatsonxSettings {
 }
 
 export function createIBMWatsonx(config: IBMWatsonxConfig = {}) {
-  const getConfig = () => ({
-    apiKey: config.apiKey ?? process.env.WATSONX_APIKEY ?? process.env.IBM_WATSONX_APIKEY,
-    projectId: config.projectId ?? process.env.WATSONX_PROJECT_ID ?? process.env.IBM_WATSONX_PROJECT_ID,
-    baseURL: config.baseURL ?? "https://us-south.ml.cloud.ibm.com",
-    headers: config.headers ?? {},
-    fetch: config.fetch,
-  })
+  const getConfig = () => {
+    const apiKey = config.apiKey ?? process.env.WATSONX_APIKEY ?? process.env.IBM_WATSONX_APIKEY
+    const projectId = config.projectId ?? process.env.WATSONX_PROJECT_ID ?? process.env.IBM_WATSONX_PROJECT_ID
+    
+    if (!apiKey) {
+      throw new Error("IBM WatsonX API key is required")
+    }
+    if (!projectId) {
+      throw new Error("IBM WatsonX project ID is required")
+    }
+    
+    return {
+      apiKey,
+      projectId,
+      baseURL: config.baseURL ?? "https://us-south.ml.cloud.ibm.com",
+      headers: config.headers ?? {},
+      fetch: config.fetch,
+    }
+  }
 
   const languageModel = (modelId: string) => 
     new IBMWatsonxLanguageModel(modelId, getConfig)
@@ -37,15 +49,15 @@ export function createIBMWatsonx(config: IBMWatsonxConfig = {}) {
   }
 }
 
-class IBMWatsonxLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = "v1"
+class IBMWatsonxLanguageModel implements LanguageModelV2 {
+  readonly specificationVersion = "v2"
   readonly provider = "ibm-watsonx"
   readonly modelId: string
   readonly maxEmbeddingVectorDimensions = undefined
 
-  private readonly config: () => Required<IBMWatsonxConfig>
+  private readonly config: () => { apiKey: string; projectId: string; baseURL: string; headers: Record<string, string>; fetch?: FetchFunction }
 
-  constructor(modelId: string, config: () => Required<IBMWatsonxConfig>) {
+  constructor(modelId: string, config: () => { apiKey: string; projectId: string; baseURL: string; headers: Record<string, string>; fetch?: FetchFunction }) {
     this.modelId = modelId
     this.config = config
   }
@@ -77,7 +89,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
     return data.access_token
   }
 
-  async doGenerate(options: LanguageModelV1CallOptions): Promise<{
+  async doGenerate(options: LanguageModelV2CallOptions): Promise<{
     text?: string
     toolCalls?: Array<{
       toolCallType: "function"
@@ -85,7 +97,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
       toolName: string
       args: unknown
     }>
-    finishReason: LanguageModelV1FinishReason
+    finishReason: LanguageModelV2FinishReason
     usage: {
       promptTokens: number
       completionTokens: number
@@ -97,9 +109,8 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
     rawResponse?: {
       headers?: Record<string, string>
     }
-    warnings?: LanguageModelV1CallWarning[]
-    logprobs?: LanguageModelV1LogProbs
-    providerMetadata?: LanguageModelV1ProviderMetadata
+    warnings?: LanguageModelV2CallWarning[]
+    providerMetadata?: LanguageModelV2ProviderMetadata
   }> {
     const { projectId, baseURL, fetch } = this.config()
     const accessToken = await this.getAccessToken()
@@ -136,7 +147,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
             message: z.string(),
           }),
         }),
-        errorToMessage: (data) => data.error.message,
+        errorToMessage: (data: { error: { message: string } }) => data.error.message,
       }),
       successfulResponseHandler: createJsonResponseHandler({
         schema: z.object({
@@ -154,7 +165,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
       fetch,
     })
 
-    const result = response.results[0]
+    const result = response.value.results[0]
 
     return {
       text: result.generated_text,
@@ -170,8 +181,8 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
     }
   }
 
-  async doStream(options: LanguageModelV1CallOptions): Promise<{
-    stream: ReadableStream<LanguageModelV1StreamPart>
+  async doStream(options: LanguageModelV2CallOptions): Promise<{
+    stream: ReadableStream<LanguageModelV2StreamPart>
     rawCall: {
       rawPrompt: unknown
       rawSettings: Record<string, unknown>
@@ -179,7 +190,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
     rawResponse?: {
       headers?: Record<string, string>
     }
-    warnings?: LanguageModelV1CallWarning[]
+    warnings?: LanguageModelV2CallWarning[]
   }> {
     const { projectId, baseURL, fetch } = this.config()
     const accessToken = await this.getAccessToken()
@@ -217,7 +228,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
             message: z.string(),
           }),
         }),
-        errorToMessage: (data) => data.error.message,
+        errorToMessage: (data: { error: { message: string } }) => data.error.message,
       }),
       successfulResponseHandler: createEventSourceResponseHandler({
         schema: z.object({
@@ -235,12 +246,12 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
       fetch,
     })
 
-    let finishReason: LanguageModelV1FinishReason = "other"
+    let finishReason: LanguageModelV2FinishReason = "other"
     let usage = { promptTokens: 0, completionTokens: 0 }
 
-    const stream = new ReadableStream<LanguageModelV1StreamPart>({
+    const stream = new ReadableStream<LanguageModelV2StreamPart>({
       async start(controller) {
-        const reader = response.getReader()
+        const reader = response.value.getReader()
         
         try {
           while (true) {
@@ -293,7 +304,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
     }
   }
 
-  private convertMessagesToPrompt(messages: LanguageModelV1Message[]): string {
+  private convertMessagesToPrompt(messages: LanguageModelV2Message[]): string {
     return messages
       .map((message) => {
         switch (message.role) {
@@ -310,7 +321,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV1 {
       .join("\n\n")
   }
 
-  private mapFinishReason(reason?: string): LanguageModelV1FinishReason {
+  private mapFinishReason(reason?: string): LanguageModelV2FinishReason {
     switch (reason) {
       case "eos_token":
       case "stop_sequence":
