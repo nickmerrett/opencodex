@@ -95,6 +95,9 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
     usage: {
       promptTokens: number
       completionTokens: number
+      inputTokens: number
+      outputTokens: number
+      totalTokens: number
     }
     rawCall: {
       rawPrompt: unknown
@@ -134,16 +137,15 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
         {},
       ),
       body,
-      failedResponseHandler: createJsonResponseHandler({
-        errorSchema: z.object({
+      failedResponseHandler: createJsonResponseHandler(
+        z.object({
           error: z.object({
             message: z.string(),
           }),
-        }),
-        errorToMessage: (data: { error: { message: string } }) => data.error.message,
-      }),
-      successfulResponseHandler: createJsonResponseHandler({
-        schema: z.object({
+        })
+      ),
+      successfulResponseHandler: createJsonResponseHandler(
+        z.object({
           results: z.array(
             z.object({
               generated_text: z.string(),
@@ -152,8 +154,8 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               stop_reason: z.string().optional(),
             })
           ),
-        }),
-      }),
+        })
+      ),
       abortSignal: options.abortSignal,
       fetch,
     })
@@ -166,6 +168,9 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
       usage: {
         promptTokens: result.input_token_count ?? 0,
         completionTokens: result.generated_token_count ?? 0,
+        inputTokens: result.input_token_count ?? 0,
+        outputTokens: result.generated_token_count ?? 0,
+        totalTokens: (result.input_token_count ?? 0) + (result.generated_token_count ?? 0),
       },
       rawCall: {
         rawPrompt: prompt,
@@ -216,16 +221,15 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
         {},
       ),
       body,
-      failedResponseHandler: createJsonResponseHandler({
-        errorSchema: z.object({
+      failedResponseHandler: createJsonResponseHandler(
+        z.object({
           error: z.object({
             message: z.string(),
           }),
-        }),
-        errorToMessage: (data: { error: { message: string } }) => data.error.message,
-      }),
-      successfulResponseHandler: createEventSourceResponseHandler({
-        schema: z.object({
+        })
+      ),
+      successfulResponseHandler: createEventSourceResponseHandler(
+        z.object({
           results: z.array(
             z.object({
               generated_text: z.string(),
@@ -234,14 +238,14 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               stop_reason: z.string().optional(),
             })
           ),
-        }),
-      }),
+        })
+      ),
       abortSignal: options.abortSignal,
       fetch,
     })
 
     let finishReason: LanguageModelV2FinishReason = "other"
-    let usage = { promptTokens: 0, completionTokens: 0 }
+    let usage = { promptTokens: 0, completionTokens: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 }
 
     const mapFinishReason = this.mapFinishReason.bind(this)
     
@@ -263,8 +267,8 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               break
             }
 
-            if (value.success && value.value.results && value.value.results[0]) {
-              const result = value.value.results[0]
+            if (value.success && (value.value as any)?.results && (value.value as any).results[0]) {
+              const result = (value.value as any).results[0]
               
               if (result.generated_text) {
                 controller.enqueue({
@@ -279,9 +283,14 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
               }
 
               if (result.input_token_count !== undefined || result.generated_token_count !== undefined) {
+                const inputTokens = result.input_token_count ?? usage.inputTokens
+                const outputTokens = result.generated_token_count ?? usage.outputTokens
                 usage = {
-                  promptTokens: result.input_token_count ?? usage.promptTokens,
-                  completionTokens: result.generated_token_count ?? usage.completionTokens,
+                  promptTokens: inputTokens,
+                  completionTokens: outputTokens,
+                  inputTokens,
+                  outputTokens,
+                  totalTokens: inputTokens + outputTokens,
                 }
               }
             }
