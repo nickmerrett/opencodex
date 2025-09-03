@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LanguageModelV2, LanguageModelV2StreamPart, type LanguageModelV2CallOptions, type LanguageModelV2CallWarning, type LanguageModelV2FinishReason, type LanguageModelV2Message, type LanguageModelV2ProviderMetadata } from "@ai-sdk/provider"
+import { LanguageModelV2, LanguageModelV2StreamPart, type LanguageModelV2CallOptions, type LanguageModelV2CallWarning, type LanguageModelV2FinishReason, type LanguageModelV2Message, type LanguageModelV2Content } from "@ai-sdk/provider"
 import { FetchFunction, combineHeaders, createEventSourceResponseHandler, createJsonResponseHandler, postJsonToApi } from "@ai-sdk/provider-utils"
 
 export type IBMWatsonxConfig = {
@@ -90,13 +90,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
   }
 
   async doGenerate(options: LanguageModelV2CallOptions): Promise<{
-    text?: string
-    toolCalls?: Array<{
-      toolCallType: "function"
-      toolCallId: string
-      toolName: string
-      args: unknown
-    }>
+    content: LanguageModelV2Content[]
     finishReason: LanguageModelV2FinishReason
     usage: {
       promptTokens: number
@@ -109,8 +103,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
     rawResponse?: {
       headers?: Record<string, string>
     }
-    warnings?: LanguageModelV2CallWarning[]
-    providerMetadata?: LanguageModelV2ProviderMetadata
+    warnings: LanguageModelV2CallWarning[]
   }> {
     const { projectId, baseURL, fetch } = this.config()
     const accessToken = await this.getAccessToken()
@@ -168,7 +161,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
     const result = response.value.results[0]
 
     return {
-      text: result.generated_text,
+      content: [{ type: "text", text: result.generated_text }],
       finishReason: this.mapFinishReason(result.stop_reason),
       usage: {
         promptTokens: result.input_token_count ?? 0,
@@ -178,6 +171,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
         rawPrompt: prompt,
         rawSettings: body.parameters,
       },
+      warnings: [],
     }
   }
 
@@ -190,7 +184,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
     rawResponse?: {
       headers?: Record<string, string>
     }
-    warnings?: LanguageModelV2CallWarning[]
+    warnings: LanguageModelV2CallWarning[]
   }> {
     const { projectId, baseURL, fetch } = this.config()
     const accessToken = await this.getAccessToken()
@@ -301,6 +295,7 @@ class IBMWatsonxLanguageModel implements LanguageModelV2 {
         rawPrompt: prompt,
         rawSettings: body.parameters,
       },
+      warnings: [],
     }
   }
 
